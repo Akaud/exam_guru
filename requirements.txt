@@ -3,4 +3,9 @@ uvicorn[standard]
 sqlalchemy~=2.0.33
 psycopg2-binary
 pydantic~=2.8.2
-python-dotenv
+python-dotenv~=0.10.5
+passlib~=1.7.4
+python-multipart
+python-jose
+cryptography
+bcrypt
