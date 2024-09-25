@@ -158,10 +158,45 @@ def delete_question(db: Session, question_id: int):
 
 def delete_choice(db: Session, choice_id: int):
     db_choice = db.query(models.Choice).filter(models.Choice.id == choice_id).first()
-
     if not db_choice:
-        return None  # You may want to raise HTTPException here
-
+        return None
     db.delete(db_choice)
     db.commit()
     return True
+
+
+def get_questions_by_exam(db: Session, exam_id: int):
+    questions = db.query(models.Question).filter(models.Question.exam_id == exam_id).all()
+    if not questions:
+        return []
+    return questions
+
+
+def get_users(db: Session):
+    users = db.query(models.User).all()
+    if not users:
+        return []
+    return users
+
+
+def create_choice(db: Session, choice: schemas.ChoiceCreate, question_id: int):
+    db_choice = models.Choice(
+        choice_text=choice.choice_text,
+        is_correct=choice.is_correct,
+        question_id=question_id
+    )
+    db.add(db_choice)
+    db.commit()
+    db.refresh(db_choice)
+    return db_choice
+
+
+def update_choice(db: Session, choice_id: int, choice: schemas.ChoiceCreate):
+    db_choice = db.query(models.Choice).filter(models.Choice.id == choice_id).first()
+    if not db_choice:
+        return None
+    db_choice.choice_text = choice.choice_text
+    db_choice.is_correct = choice.is_correct
+    db.commit()
+    db.refresh(db_choice)
+    return db_choice

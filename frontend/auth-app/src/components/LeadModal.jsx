@@ -13,7 +13,7 @@ const LeadModal = ({ active, handleModal, token, id, setErrorMessage }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const response = await fetch(`http://localhost:8000/exams/${id}/get`, requestOptions);
+      const response = await fetch(`http://localhost:8000/exam/${id}/`, requestOptions);
 
       if (!response.ok) {
         setErrorMessage("Could not get the exam");
@@ -47,7 +47,7 @@ const LeadModal = ({ active, handleModal, token, id, setErrorMessage }) => {
         description: description,
       }),
     };
-    const response = await fetch("http://localhost:8000/exams/create", requestOptions);
+    const response = await fetch("http://localhost:8000/exam/", requestOptions);
     if (!response.ok) {
       setErrorMessage("Something went wrong when creating exam");
     } else {
@@ -69,7 +69,7 @@ const LeadModal = ({ active, handleModal, token, id, setErrorMessage }) => {
         description: description,
       }),
     };
-    const response = await fetch(`http://localhost:8000/exams/${id}/update`, requestOptions);
+    const response = await fetch(`http://localhost:8000/exam/${id}`, requestOptions);
     if (!response.ok) {
       setErrorMessage("Something went wrong when updating exam");
     } else {

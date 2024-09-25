@@ -25,7 +25,7 @@ const Table = () => {
         Authorization: "Bearer " + token,
       },
     };
-    const response = await fetch(`http://localhost:8000/exams/${id}/delete`, requestOptions);
+    const response = await fetch(`http://localhost:8000/exam/${id}`, requestOptions);
     if (!response.ok) {
       setErrorMessage("Failed to delete exam");
     }
@@ -43,7 +43,7 @@ const Table = () => {
   };
 
   try {
-    const response = await fetch("http://localhost:8000/exams/get", requestOptions);  // Fetch all exams
+    const response = await fetch("http://localhost:8000/exams", requestOptions);  // Fetch all exams
     if (!response.ok) {
       setErrorMessage("Something went wrong. Couldn't load the exams");
       return;

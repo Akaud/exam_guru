@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 
 from database import engine, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Annotated
+from typing import Annotated, List
 
 import crud
 import models
@@ -49,8 +49,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
-@app.post("/register", response_model=schemas.User)
-async def register_user(user: schemas.UserCreate, db: db_dependency)->schemas.User:
+
+@app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
+async def register_user(user: schemas.UserCreate, db: db_dependency) -> schemas.User:
     db_user = crud.get_user(db=db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="User already exists")
@@ -111,6 +112,12 @@ async def verify_user_token(token: str):
     return {"message": "Token is valid"}
 
 
+@app.get("/users", response_model=List[schemas.User])
+async def list_users(db: db_dependency):
+    users = crud.get_users(db=db)
+    return users
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -124,7 +131,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    user_id = crud.get_user_id(db,user_username)
+    user_id = crud.get_user_id(db, user_username)
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
         raise credentials_exception
@@ -132,8 +139,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 
 # Update a user
-@app.put("/users/{user_id}", response_model=schemas.User)
-async def update_existing_user(user_id: int, user: schemas.UserCreate, db: db_dependency):
+@app.put("/user/{user_id}", response_model=schemas.User)
+async def update_user(user_id: int, user: schemas.UserCreate, db: db_dependency):
     db_user = crud.update_user(db, user_id, user)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -141,7 +148,7 @@ async def update_existing_user(user_id: int, user: schemas.UserCreate, db: db_de
 
 
 # Delete a user
-@app.delete("/users/{user_id}", response_model=dict)
+@app.delete("/user/{user_id}", response_model=dict)
 async def delete_user(user_id: int, db: db_dependency):
     result = crud.delete_user(db, user_id)
     if not result:
@@ -152,7 +159,7 @@ async def delete_user(user_id: int, db: db_dependency):
 ### Exam Routes ###
 
 # Create an exam
-@app.post("/exams/create", response_model=schemas.Exam)
+@app.post("/exam/", response_model=schemas.Exam, status_code=status.HTTP_201_CREATED)
 def create_exam(exam: schemas.ExamCreate, db: db_dependency, current_user: models.User = Depends(get_current_user)):
     new_exam = models.Exam(
         title=exam.title,
@@ -164,8 +171,9 @@ def create_exam(exam: schemas.ExamCreate, db: db_dependency, current_user: model
     db.refresh(new_exam)
     return new_exam
 
+
 # Read a specific exam
-@app.get("/exams/{exam_id}/get", response_model=schemas.Exam)
+@app.get("/exam/{exam_id}", response_model=schemas.Exam)
 async def read_exam(exam_id: int, db: db_dependency):
     db_exam: object = crud.read_exam(db=db, exam_id=exam_id)
     if db_exam is None:
@@ -173,13 +181,8 @@ async def read_exam(exam_id: int, db: db_dependency):
     return db_exam
 
 
-@app.get("/exams/get")
-async def read_exams(db: db_dependency):
-    db_exams = crud.read_exams(db=db)  # Fetch all exams from the database
-    return db_exams
-
 # Update an exam
-@app.put("/exams/{exam_id}/update", response_model=schemas.Exam)
+@app.put("/exam/{exam_id}", response_model=schemas.Exam)
 async def update_exam(exam_id: int, exam: schemas.ExamCreate, db: db_dependency):
     db_exam = crud.update_exam(db, exam_id, exam)
     if db_exam is None:
@@ -187,8 +190,9 @@ async def update_exam(exam_id: int, exam: schemas.ExamCreate, db: db_dependency)
     return db_exam
 
 
+
 # Delete an exam
-@app.delete("/exams/{exam_id}/delete", response_model=dict)
+@app.delete("/exam/{exam_id}", response_model=dict)
 async def delete_exam(exam_id: int, db: db_dependency):
     result = crud.delete_exam(db, exam_id)
     if not result:
@@ -196,19 +200,17 @@ async def delete_exam(exam_id: int, db: db_dependency):
     return {"message": "Exam deleted successfully"}
 
 
-### Question Routes ###
+@app.get("/exams/")
+async def read_exams(db: db_dependency):
+    db_exams = crud.read_exams(db=db)  # Fetch all exams from the database
+    return db_exams
 
-# Get a question
-@app.get("/questions/{question_id}")
-async def read_question(question_id: int, db: Session = Depends(get_db)):
-    result = db.query(models.Question).filter(models.Question.id == question_id).first()
-    if not result:
-        raise HTTPException(status_code=404, detail="Question not found")
-    return result
+
+### Question Routes ###
 
 
 # Create a question
-@app.post("/questions/", response_model=schemas.Question)
+@app.post("/exam/{exam_id}/question/", response_model=schemas.Question, status_code=status.HTTP_201_CREATED)
 async def create_question(question: schemas.QuestionCreate, exam_id: int, db: db_dependency):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not db_exam:
@@ -217,9 +219,24 @@ async def create_question(question: schemas.QuestionCreate, exam_id: int, db: db
     return db_question
 
 
+# Get a question
+@app.get("/exam/{exam_id}/question/{question_id}")
+async def read_question(exam_id: int,question_id: int, db: Session = Depends(get_db)):
+    db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not db_exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    result = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not result:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return result
+
+
 # Update a question
-@app.put("/questions/{question_id}", response_model=schemas.Question)
-async def update_question(question_id: int, question: schemas.QuestionCreate, db: db_dependency):
+@app.put("/exam/{exam_id}/question/{question_id}", response_model=schemas.Question)
+async def update_question(exam_id: int,question_id: int, question: schemas.QuestionCreate, db: db_dependency):
+    db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not db_exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
     db_question = crud.update_question(db, question_id, question)
     if db_question is None:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -227,33 +244,112 @@ async def update_question(question_id: int, question: schemas.QuestionCreate, db
 
 
 # Delete a question
-@app.delete("/questions/{question_id}", response_model=dict)
-async def delete_question(question_id: int, db: db_dependency):
+@app.delete("/exam/{exam_id}/question/{question_id}", response_model=dict)
+async def delete_question(exam_id: int,question_id: int, db: db_dependency):
+    db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not db_exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
     result = crud.delete_question(db, question_id)
     if not result:
         raise HTTPException(status_code=404, detail="Question not found")
     return {"message": "Question deleted successfully"}
 
 
+@app.get("/exams/{exam_id}/questions", response_model=List[schemas.Question])
+async def list_questions_by_exam(exam_id: int, db: db_dependency):
+
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    questions = crud.get_questions_by_exam(db=db, exam_id=exam_id)
+
+    if not questions:
+        raise HTTPException(status_code=404, detail="No questions found for this exam")
+
+    return questions
+
 ### Choice Routes ###
 
-# Get choices for a question
-@app.get("/choices/{question_id}")
-async def read_choices(question_id: int, db: Session = Depends(get_db)):
-    result = db.query(models.Choice).filter(models.Choice.question_id == question_id).all()
+
+@app.post("/exam/{exam_id}/question/{question_id}/choice/", response_model=schemas.Choice,
+          status_code=status.HTTP_201_CREATED)
+async def create_choice(choice: schemas.ChoiceCreate,exam_id: int, question_id: int, db: db_dependency):
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db_choice = crud.create_choice(db=db, choice=choice, question_id=question_id)
+    return db_choice
+
+
+@app.get("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=schemas.Choice)
+async def read_choice(exam_id: int, question_id: int,choice_id: int, db: Session = Depends(get_db)):
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    result = db.query(models.Choice).filter(models.Choice.id == choice_id).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Choices are not found")
+        raise HTTPException(status_code=404, detail="Choice not found")
     return result
 
+@app.put("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=schemas.Choice)
+async def update_choice(exam_id: int, question_id: int, choice_id: int, choice: schemas.ChoiceCreate, db: db_dependency):
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db_choice = crud.update_choice(db=db, choice_id=choice_id, choice=choice)
+    if db_choice is None:
+        raise HTTPException(status_code=404, detail="Choice not found")
+    return db_choice
 
-# Delete a choice
-@app.delete("/choices/{choice_id}", response_model=dict)
-async def delete_choice(choice_id: int, db: db_dependency):
+
+@app.delete("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=dict)
+async def delete_choice(exam_id: int, question_id: int,choice_id: int, db: db_dependency):
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
     result = crud.delete_choice(db, choice_id)
     if not result:
         raise HTTPException(status_code=404, detail="Choice not found")
     return {"message": "Choice deleted successfully"}
 
-@app.get("/api")
-async def root():
-    return{"message": "Hello World"}
+
+@app.get("/exam/{exam_id}/question/{question_id}/choices", response_model=List[schemas.Choice])
+async def list_choices_by_question(exam_id: int, question_id: int, db: Session = Depends(get_db)):
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    question = db.query(models.Question).filter(
+        models.Question.id == question_id,
+        models.Question.exam_id == exam_id
+    ).first()
+
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found or does not belong to the specified exam")
+
+    choices = db.query(models.Choice).filter(models.Choice.question_id == question_id).all()
+
+    if not choices:
+        raise HTTPException(status_code=404, detail="Choices not found for the specified question")
+
+    return choices
+
+
+
+
+
+
+
