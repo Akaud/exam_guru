@@ -1,20 +1,22 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import List
+
 
 # User creation model (used for creating a user, includes password)
 class UserCreate(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     password: str
     name: str
     surname: str
     role: str
 
+
 # User response model (used for reading user data, excludes password)
 class User(BaseModel):
     id: int
     username: str
-    email: str
+    email: EmailStr
     name: str
     surname: str
     role: str
@@ -22,10 +24,12 @@ class User(BaseModel):
     class Config:
         from_attributes = True  # This is the correct option to use for ORM integration
 
+
 # Exam creation model
 class ExamCreate(BaseModel):
     title: str
     description: str
+
 
 # Exam response model
 class Exam(BaseModel):
@@ -37,10 +41,12 @@ class Exam(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Choice creation model (used when creating choices)
 class ChoiceCreate(BaseModel):
     choice_text: str
     is_correct: bool
+
 
 # Choice response model (used when reading choices)
 class Choice(BaseModel):
@@ -52,10 +58,12 @@ class Choice(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Question creation model (used when creating questions)
 class QuestionCreate(BaseModel):
     question_text: str
     choices: List[ChoiceCreate]
+
 
 # Question response model (used when reading questions)
 class Question(BaseModel):

@@ -31,7 +31,7 @@ class Question(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     question_text = Column(String)
-    exam_id = Column(Integer, ForeignKey("exams.id"))
+    exam_id = Column(Integer, ForeignKey('exams.id'))
 
     exam = relationship("Exam", back_populates="questions")
     choices = relationship("Choice", back_populates="question")

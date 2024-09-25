@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy.orm import Session
 import models
 import schemas
@@ -22,6 +24,18 @@ def create_user(db: Session, user: schemas.UserCreate):
 def get_user(db: Session, username: str):
     db_user = db.query(models.User).filter(models.User.username == username).first()
     return db_user
+
+
+def get_user_id(db: Session, username: str) -> Any | None:
+    # Query to find the user by username
+    db_user = db.query(models.User).filter(models.User.username == username).first()
+
+    # If user is found, return the user's ID
+    if db_user:
+        return db_user.id
+
+    # If no user is found, return None or raise an exception
+    return None
 
 
 def update_user(db: Session, user_id: int, user_update: schemas.UserCreate):
@@ -60,9 +74,14 @@ def create_exam(db: Session, exam: schemas.ExamCreate, user_id: int):
     db.refresh(db_exam)
     return db_exam
 
+
 def read_exam(db: Session, exam_id: int):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     return db_exam
+
+
+def read_exams(db: Session):
+    return db.query(models.Exam).all()
 
 
 def update_exam(db: Session, exam_id: int, exam_update: schemas.ExamCreate):

@@ -1,35 +1,31 @@
-import React, {useEffect, useState} from 'react';
-
-const App=()=> {
-    const [message,setMessage]=useState('');
-    const getWelcomeMessage = async()=>{
-        const requestOptions={
-            method:'GET',
-            headers:{
-                "Content-Type": "application/json",
-            },
-        };
-        // const response=await fetch("/api",requestOptions);
-        const response = await fetch("/api", {
-            headers:{
-            accept: 'application/json',
-            'User-agent': 'learning app',
-        }
-});
-        const data = response.json();
-        if(!response.ok){
-            console.log("error");
-        }else{
-            setMessage(data.message);
-        }
-    }
-    useEffect(() => {
-        getWelcomeMessage();
-    },[])
+import Register from './components/Register.jsx';
+import Header from './components/Header.jsx';
+import Login from './components/Login.jsx';
+import {useContext} from "react";
+import {UserContext} from "./context/UserContext";
+import Table from "./components/Table";
+const App = () => {
+    const [token] = useContext(UserContext);
   return (
-      <div>
-          <h1>{message}</h1>
+
+    <div>
+       <>
+      <Header title={"Exam Guru"} />
+      <div className="columns">
+        <div className="column"></div>
+        <div className="column m-5 is-two-thirds">
+          {!token ? (
+            <div className="columns">
+              <Register /><Login />
+            </div>
+          ): <Table/>}
+        </div>
+        <div className="column"></div>
       </div>
+    </>
+    </div>
+
   );
-}
+};
+
 export default App;

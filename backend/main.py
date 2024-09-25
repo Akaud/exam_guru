@@ -6,8 +6,6 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
-from starlette.responses import RedirectResponse
-from starlette.staticfiles import StaticFiles
 
 from database import engine, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,12 +17,10 @@ import schemas
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
-    "http://localhost:3001",
+    "http://localhost:3000",
     "https://yourfrontenddomain.com",
 ]
 app.add_middleware(
@@ -53,13 +49,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    return RedirectResponse(url="/static/favicon.ico")
-
-
 @app.post("/register", response_model=schemas.User)
-async def register_user(user: schemas.UserCreate, db: db_dependency):
+async def register_user(user: schemas.UserCreate, db: db_dependency)->schemas.User:
     db_user = crud.get_user(db=db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="User already exists")
@@ -120,13 +111,24 @@ async def verify_user_token(token: str):
     return {"message": "Token is valid"}
 
 
-# Read a user
-@app.get("/users/{username}")
-async def read_user(username: str, db: db_dependency):
-    db_user = crud.get_user(db=db, username=username)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_username: str = payload.get("sub")
+        if user_username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user_id = crud.get_user_id(db,user_username)
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    return user
 
 
 # Update a user
@@ -150,13 +152,20 @@ async def delete_user(user_id: int, db: db_dependency):
 ### Exam Routes ###
 
 # Create an exam
-@app.post("/exams/", response_model=schemas.Exam)
-async def create_exam(exam: schemas.ExamCreate, db: db_dependency, user_id: int = 1):
-    return crud.create_exam(db=db, exam=exam, user_id=user_id)
-
+@app.post("/exams/create", response_model=schemas.Exam)
+def create_exam(exam: schemas.ExamCreate, db: db_dependency, current_user: models.User = Depends(get_current_user)):
+    new_exam = models.Exam(
+        title=exam.title,
+        description=exam.description,
+        owner_id=current_user.id
+    )
+    db.add(new_exam)
+    db.commit()
+    db.refresh(new_exam)
+    return new_exam
 
 # Read a specific exam
-@app.get("/exams/{exam_id}", response_model=schemas.Exam)
+@app.get("/exams/{exam_id}/get", response_model=schemas.Exam)
 async def read_exam(exam_id: int, db: db_dependency):
     db_exam: object = crud.read_exam(db=db, exam_id=exam_id)
     if db_exam is None:
@@ -164,9 +173,14 @@ async def read_exam(exam_id: int, db: db_dependency):
     return db_exam
 
 
+@app.get("/exams/get")
+async def read_exams(db: db_dependency):
+    db_exams = crud.read_exams(db=db)  # Fetch all exams from the database
+    return db_exams
+
 # Update an exam
-@app.put("/exams/{exam_id}", response_model=schemas.Exam)
-async def update_existing_exam(exam_id: int, exam: schemas.ExamCreate, db: db_dependency):
+@app.put("/exams/{exam_id}/update", response_model=schemas.Exam)
+async def update_exam(exam_id: int, exam: schemas.ExamCreate, db: db_dependency):
     db_exam = crud.update_exam(db, exam_id, exam)
     if db_exam is None:
         raise HTTPException(status_code=404, detail="Exam not found")
@@ -174,8 +188,8 @@ async def update_existing_exam(exam_id: int, exam: schemas.ExamCreate, db: db_de
 
 
 # Delete an exam
-@app.delete("/exams/{exam_id}", response_model=dict)
-async def delete_existing_exam(exam_id: int, db: db_dependency):
+@app.delete("/exams/{exam_id}/delete", response_model=dict)
+async def delete_exam(exam_id: int, db: db_dependency):
     result = crud.delete_exam(db, exam_id)
     if not result:
         raise HTTPException(status_code=404, detail="Exam not found")
