@@ -1,30 +1,32 @@
 import React, { useState, useContext } from "react";
-
-import ErrorMessage from "./ErrorMessage";
 import { UserContext } from "../context/UserContext";
+import { useNotification } from "../context/NotificationContext"; // Import useNotification hook
 
-const Login = () => {
+const Login = ({ toggleForm }) => {
   const [Username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [, setToken] = useContext(UserContext);
+  const [,,,,setToken] = useContext(UserContext); // Correctly destructuring token, userRole, and setToken
+  const { addNotification } = useNotification(); // Get addNotification function from context
 
   const submitLogin = async () => {
     const requestOptions = {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: JSON.stringify(
-        `grant_type=&username=${Username}&password=${password}&scope=&client_id=&client_secret=`
-      ),
+      body: new URLSearchParams({
+        username: Username,
+        password: password,
+      }),
     };
 
     const response = await fetch("http://localhost:8000/token", requestOptions);
     const data = await response.json();
 
     if (!response.ok) {
-      setErrorMessage(data.detail);
+      addNotification(data.detail, "error"); // Show error notification
     } else {
       setToken(data.access_token);
+      localStorage.setItem("token", data.access_token);
+      addNotification("Login successful!", "success"); // Show success notification
     }
   };
 
@@ -34,9 +36,10 @@ const Login = () => {
   };
 
   return (
-    <div className="column">
+    <div className="column is-half is-offset-one-quarter">
       <form className="box" onSubmit={handleSubmit}>
         <h1 className="title has-text-centered">Login</h1>
+
         <div className="field">
           <label className="label">Username</label>
           <div className="control">
@@ -50,6 +53,7 @@ const Login = () => {
             />
           </div>
         </div>
+
         <div className="field">
           <label className="label">Password</label>
           <div className="control">
@@ -63,11 +67,23 @@ const Login = () => {
             />
           </div>
         </div>
-        <ErrorMessage message={errorMessage} />
+
         <br />
-        <button className="button is-primary" type="submit">
-          Login
-        </button>
+        <div className="has-text-centered">
+          <button className="button is-primary" type="submit">
+            Login
+          </button>
+        </div>
+
+        <br />
+        <div className="has-text-centered">
+          <p>
+            Don't have an account?{" "}
+            <a href="#" onClick={toggleForm}>
+              Register here
+            </a>
+          </p>
+        </div>
       </form>
     </div>
   );

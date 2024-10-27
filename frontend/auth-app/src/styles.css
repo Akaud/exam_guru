@@ -1,0 +1,291 @@
+/* Existing styles */
+.day {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+/* Apply Raleway as the default font */
+body {
+  font-family: 'Raleway', sans-serif; /* Set Raleway as the default font */
+  margin: 0; /* Remove default margin */
+  padding: 0; /* Remove default padding */
+  font-size: 24px; /* Increase font size for better readability */
+}
+
+.day-name {
+  display: block;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.day-date {
+  display: block;
+  font-size: 1rem;
+  color: gray;
+}
+
+/* New styles for Create Exam button */
+.create-exam-button {
+  font-size: 1.2rem; /* Increase font size for visibility */
+  padding: 12px 24px; /* Increase padding for a larger button */
+  transition: background-color 0.3s, transform 0.2s; /* Smooth transition for hover effects */
+  display: inline-block; /* Ensure button has block-level appearance */
+  margin: 0 auto; /* Center the button */
+}
+
+/* Button hover effects */
+.create-exam-button.is-success:hover {
+  color: white; /* Ensure text is white */
+  transform: scale(1.05); /* Slightly increase size on hover */
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.5); /* Add shadow effect on hover */
+}
+
+.day-card {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 10px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s; /* Add a transition for hover effect */
+}
+
+.day-card:hover {
+  transform: scale(1.05); /* Scale up on hover */
+}
+
+.columns.is-multiline {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.current-day {
+  background-color: #ffeb3b;
+  border: 2px solid #fbc02d;
+}
+
+/* New styles */
+.day-events {
+  margin-top: 10px;
+}
+
+.event-card {
+  background-color: white;
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column; /* Keep items in a column */
+  justify-content: center; /* Center vertically */
+  align-items: center; /* Center horizontally */
+  text-align: center; /* Center text within the card */
+}
+
+/* Highlight for public events */
+.public-event {
+  background-color: #98e4f4; /* Light blue background for public events */
+  border: 1px solid #b2ebf2; /* Border color for public events */
+}
+
+/* Highlight for private events */
+.private-event {
+  background-color: #fff3e0; /* Light orange background for private events */
+  border: 1px solid #ffe0b2; /* Border color for private events */
+}
+
+.event-name {
+  font-weight: bold;
+}
+
+.event-time {
+  font-size: 0.9em; /* Slightly smaller font for time */
+  color: gray; /* Optional: change color for differentiation */
+  margin-top: 5px; /* Space between name and time */
+}
+
+.event-actions {
+  display: flex;
+  flex-wrap: wrap; /* Allow buttons to wrap to the next line */
+  justify-content: center; /* Center buttons horizontally */
+  gap: 5px; /* Add space between buttons */
+}
+
+.event-actions .button {
+  flex: 1 1 auto; /* Allow buttons to grow and shrink */
+  min-width: 100px; /* Minimum width for buttons */
+  margin: 5px; /* Space around buttons */
+}
+
+/* Tooltip styles */
+.tooltip {
+  position: absolute; /* Positioning for tooltip */
+  background-color: #fff; /* Background color */
+  border: 1px solid #ccc; /* Border */
+  border-radius: 4px; /* Rounded corners */
+  padding: 10px; /* Inner padding */
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2); /* Shadow effect */
+  z-index: 100; /* Above other elements */
+  white-space: nowrap; /* Prevent text wrapping */
+  transform: translate(-50%, -100%); /* Position above the cursor */
+}
+
+/* Styles for Question Redactor */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center the content horizontally */
+  margin-top: 20px; /* Space above the container */
+}
+
+.buttons {
+  display: flex;
+  justify-content: center; /* Center the buttons horizontally */
+  gap: 10px; /* Space between buttons */
+  margin-bottom: 20px; /* Space below buttons */
+}
+
+.form-container {
+  width: 100%; /* Full width of the container */
+  max-width: 600px; /* Limit the max width for better readability */
+}
+
+.question-block {
+  margin-bottom: 20px; /* Space between question blocks */
+}
+
+.choice-block {
+  display: flex;
+  align-items: center; /* Align items in choice block */
+}
+
+.choice-input {
+  flex-grow: 1; /* Allow input to grow */
+  margin-right: 10px; /* Space between input and remove button */
+}
+
+.remove-choice {
+  background-color: transparent; /* Make the button background transparent */
+  border: none; /* Remove border */
+  color: red; /* Set text color for the button */
+  cursor: pointer; /* Pointer cursor on hover */
+}
+
+.remove-choice:hover {
+  text-decoration: underline; /* Underline on hover for clarity */
+}
+
+.user-info {
+  padding: 10px;
+  background-color: #e7f3ff; /* Light blue background */
+  border-radius: 5px;
+  border: 1px solid #b3e0ff; /* Border color */
+  margin-bottom: 20px; /* Space below the user info section */
+}
+
+.user-info h4 {
+  margin: 0;
+  font-size: 1.5rem; /* Larger font for the user's name */
+}
+
+.user-info p {
+  margin: 5px 0 0; /* Adjust margins for paragraphs */
+}
+
+.correct {
+  background-color: #d4edda; /* Light green for correct answers */
+  border-color: #c3e6cb; /* Darker green for borders */
+}
+
+.incorrect {
+  background-color: #f8d7da; /* Light red for incorrect answers */
+  border-color: #f5c6cb; /* Darker red for borders */
+}
+
+/* Define a wider card */
+.wide-card {
+  width: 100%; /* Take up full container width */
+  max-width: 1200px; /* Limit max width for readability */
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px auto;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease-in-out;
+}
+
+.wide-card:hover {
+  transform: scale(1.05); /* Hover effect */
+}
+
+/* Additional styles for responsive behavior */
+@media (max-width: 768px) {
+  .event-actions .button {
+    flex-basis: 100%; /* Full width on smaller screens */
+  }
+}
+
+/* Existing styles */
+
+.logout-button {
+  font-size: 1.2rem; /* Increase font size for visibility */
+  padding: 12px 24px; /* Increase padding for a larger button */
+  transition: background-color 0.3s, transform 0.2s; /* Smooth transition for hover effects */
+  display: inline-block; /* Ensure button has block-level appearance */
+  margin: 0 auto; /* Center the button */
+}
+
+/* Button hover effects */
+.logout-button.is-danger:hover {
+  color: white; /* Ensure text is white */
+  transform: scale(1.05); /* Slightly increase size on hover */
+  box-shadow: 0 4px 15px rgba(255, 0, 0, 0.5); /* Add shadow effect on hover */
+}
+/* Styles for the question heading */
+.question-block h3 {
+    word-wrap: break-word; /* Break long words onto the next line */
+    overflow-wrap: break-word; /* Same as word-wrap, for better compatibility */
+    white-space: normal; /* Allow text to wrap */
+    margin: 0; /* Remove default margin */
+    font-size: 1.5rem; /* Control font size for better readability */
+}
+
+/* Optional: To limit the max width of the question block for better alignment */
+.question-block {
+    max-width: 800px; /* Control max width for question blocks */
+    margin: 0 auto; /* Center question block */
+}
+
+/* Add this CSS to handle text wrapping for titles and descriptions */
+.exam-title {
+  word-wrap: break-word;   /* Break long words onto the next line */
+  white-space: normal;     /* Allow wrapping on spaces */
+  overflow-wrap: break-word; /* Safeguard to ensure word break behavior */
+}
+
+.exam-description {
+  word-wrap: break-word;   /* Break long words onto the next line */
+  white-space: normal;     /* Allow wrapping on spaces */
+  overflow-wrap: break-word; /* Safeguard to ensure word break behavior */
+}
+
+/* Optional: Limit description to 3 lines and hide the overflow */
+.exam-description {
+  max-height: 4.5em;       /* Limit to 3 lines (1.5em per line) */
+  overflow: hidden;        /* Hide any text beyond 3 lines */
+  text-overflow: ellipsis; /* Add ellipsis (...) for overflow */
+}
+html, body {
+    height: 100%; /* Ensure the body takes full height */
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column; /* Stack children vertically */
+    min-height: 100vh; /* Full viewport height */
+}
+
+.columns {
+    flex: 1; /* Allow the content to grow */
+}

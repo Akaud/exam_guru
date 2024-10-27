@@ -1,6 +1,9 @@
+import logging
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -20,16 +23,20 @@ app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
-    "http://localhost:3000",
-    "https://yourfrontenddomain.com",
+    "http://localhost:3000",  # Your React frontend
 ]
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -107,9 +114,21 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
 
 @app.get("/verify-token/{token}")
-async def verify_user_token(token: str):
-    verify_token(token=token)
-    return {"message": "Token is valid"}
+async def verify_user_token(token: str, db: Session = Depends(get_db)):
+    # Verify the token and return the user's role and name
+    payload = verify_token(token=token)
+    username = payload.get("sub")
+
+    user = crud.get_user(db, username=username)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "message": "Token is valid",
+        "role": user.role,
+        "user_id": user.id,
+        "name": user.name  # Return the user's name
+    }
 
 
 @app.get("/users", response_model=List[schemas.User])
@@ -137,6 +156,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
     return user
 
+def check_user_role(required_role: str):
+    def role_checker(current_user: schemas.User = Depends(get_current_user)):
+        if current_user.role != required_role:
+            raise HTTPException(status_code=403, detail="Operation not permitted")
+        return current_user
+    return role_checker
 
 # Update a user
 @app.put("/user/{user_id}", response_model=schemas.User)
@@ -211,12 +236,16 @@ async def read_exams(db: db_dependency):
 
 # Create a question
 @app.post("/exam/{exam_id}/question/", response_model=schemas.Question, status_code=status.HTTP_201_CREATED)
-async def create_question(question: schemas.QuestionCreate, exam_id: int, db: db_dependency):
+async def create_question(question: schemas.QuestionCreate, exam_id: int, db: Session = Depends(get_db)):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not db_exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    db_question = crud.create_question(db=db, question=question, exam_id=exam_id)
-    return db_question
+
+    try:
+        db_question = crud.create_question(db=db, question=question, exam_id=exam_id)
+        return db_question
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create question: {str(e)}")
 
 
 # Get a question
@@ -278,7 +307,7 @@ async def create_choice(choice: schemas.ChoiceCreate,exam_id: int, question_id: 
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
     db_choice = crud.create_choice(db=db, choice=choice, question_id=question_id)
@@ -290,7 +319,7 @@ async def read_choice(exam_id: int, question_id: int,choice_id: int, db: Session
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
     result = db.query(models.Choice).filter(models.Choice.id == choice_id).first()
@@ -303,7 +332,7 @@ async def update_choice(exam_id: int, question_id: int, choice_id: int, choice: 
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
     db_choice = crud.update_choice(db=db, choice_id=choice_id, choice=choice)
@@ -317,7 +346,7 @@ async def delete_choice(exam_id: int, question_id: int,choice_id: int, db: db_de
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    question = db.query(models.Exam).filter(models.Exam.id == question_id).first()
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
     result = crud.delete_choice(db, choice_id)
@@ -326,27 +355,33 @@ async def delete_choice(exam_id: int, question_id: int,choice_id: int, db: db_de
     return {"message": "Choice deleted successfully"}
 
 
-@app.get("/exam/{exam_id}/question/{question_id}/choices", response_model=List[schemas.Choice])
+@app.get("/exam/{exam_id}/question/{question_id}/choices")
 async def list_choices_by_question(exam_id: int, question_id: int, db: Session = Depends(get_db)):
+    # Check if the exam exists
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
+        logger.warning(f"Exam with ID {exam_id} not found")
         raise HTTPException(status_code=404, detail="Exam not found")
 
+    # Check if the question belongs to the specified exam
     question = db.query(models.Question).filter(
         models.Question.id == question_id,
         models.Question.exam_id == exam_id
     ).first()
 
     if not question:
+        logger.warning(f"Question with ID {question_id} not found for Exam ID {exam_id}")
         raise HTTPException(status_code=404, detail="Question not found or does not belong to the specified exam")
 
+    # Retrieve the choices for the question
     choices = db.query(models.Choice).filter(models.Choice.question_id == question_id).all()
 
     if not choices:
+        logger.warning(f"No choices found for Question ID {question_id}")
         raise HTTPException(status_code=404, detail="Choices not found for the specified question")
 
-    return choices
-
+    # Format the choices to match the expected response model
+    return [{"id": choice.id, "choice_text": choice.choice_text, "is_correct": choice.is_correct} for choice in choices]
 
 
 
