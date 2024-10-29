@@ -189,7 +189,7 @@ const QuestionRedactor = () => {
                     const formData = new FormData();
                     formData.append("file", question.image);
 
-                    const uploadResponse = await fetch("http://localhost:8000/upload/", {
+                    const uploadResponse = await fetch("http://localhost:8000/image/", {
                         method: "POST",
                         body: formData,
                     });
@@ -201,7 +201,7 @@ const QuestionRedactor = () => {
                     }
 
                     const imageData = await uploadResponse.json();
-                    imageUrl = imageData.filename ? `http://localhost:8000/static/${imageData.filename}` : null;
+                    imageUrl = imageData.filename ? `http://localhost:8000/image/${imageData.filename}` : null;
                 }
 
                 const requestOptions = {
@@ -256,7 +256,7 @@ const QuestionRedactor = () => {
             const filename = typeof question.image === 'string' ? question.image.split('/').pop() : null;
             if (filename) {
                 try {
-                    const response = await fetch(`http://localhost:8000/delete-image/${filename}`, {
+                    const response = await fetch(`http://localhost:8000/image/${filename}`, {
                         method: "DELETE",
                         headers: {
                             "Content-Type": "application/json",
@@ -361,7 +361,7 @@ const QuestionRedactor = () => {
                                         type="file"
                                         id={`file-input-${questionIndex}`}
                                         accept="image/*"
-                                        style={{display: 'none'}} // Hide the input
+                                        style={{display: 'none'}}
                                         onChange={(e) => handleImageChange(questionIndex, e.target.files[0])}
                                     />
                                 </div>

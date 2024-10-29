@@ -5,7 +5,6 @@ from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
@@ -24,23 +23,20 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
-    "http://localhost:3000",  # Your React frontend
+    "http://localhost:3000",
 ]
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-# Configure logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -63,7 +59,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 db_dependency = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
+@app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED,tags=["Users"])
 async def register_user(user: schemas.UserCreate, db: db_dependency) -> schemas.User:
     db_user = crud.get_user(db=db, username=user.username)
     if db_user:
@@ -121,7 +117,6 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
 @app.get("/verify-token/{token}")
 async def verify_user_token(token: str, db: Session = Depends(get_db)):
-    # Verify the token and return the user's role and name
     payload = verify_token(token=token)
     username = payload.get("sub")
 
@@ -133,11 +128,10 @@ async def verify_user_token(token: str, db: Session = Depends(get_db)):
         "message": "Token is valid",
         "role": user.role,
         "user_id": user.id,
-        "name": user.name  # Return the user's name
+        "name": user.name
     }
 
-
-@app.get("/users", response_model=List[schemas.User])
+@app.get("/users", response_model=List[schemas.User],tags=["Users"])
 async def list_users(db: db_dependency):
     users = crud.get_users(db=db)
     return users
@@ -162,15 +156,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
     return user
 
-def check_user_role(required_role: str):
-    def role_checker(current_user: schemas.User = Depends(get_current_user)):
-        if current_user.role != required_role:
-            raise HTTPException(status_code=403, detail="Operation not permitted")
-        return current_user
-    return role_checker
-
-# Update a user
-@app.put("/user/{user_id}", response_model=schemas.User)
+@app.put("/user/{user_id}", response_model=schemas.User,tags=["Users"])
 async def update_user(user_id: int, user: schemas.UserCreate, db: db_dependency):
     db_user = crud.update_user(db, user_id, user)
     if db_user is None:
@@ -178,8 +164,7 @@ async def update_user(user_id: int, user: schemas.UserCreate, db: db_dependency)
     return db_user
 
 
-# Delete a user
-@app.delete("/user/{user_id}", response_model=dict)
+@app.delete("/user/{user_id}", response_model=dict,tags=["Users"])
 async def delete_user(user_id: int, db: db_dependency):
     result = crud.delete_user(db, user_id)
     if not result:
@@ -187,11 +172,17 @@ async def delete_user(user_id: int, db: db_dependency):
     return {"message": "User deleted successfully"}
 
 
-### Exam Routes ###
+#### Exam Routes ####
 
-# Create an exam
-@app.post("/exam/", response_model=schemas.Exam, status_code=status.HTTP_201_CREATED)
-def create_exam(exam: schemas.ExamCreate, db: db_dependency, current_user: models.User = Depends(get_current_user)):
+@app.post("/exam/", response_model=schemas.Exam, status_code=status.HTTP_201_CREATED, tags=["Exams"])
+def create_exam(
+    exam: schemas.ExamCreate,
+    db: db_dependency,
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role not in ["teacher", "admin"]:
+        raise HTTPException(status_code=403, detail="You do not have permission to create an exam")
+
     new_exam = models.Exam(
         title=exam.title,
         description=exam.description,
@@ -203,49 +194,75 @@ def create_exam(exam: schemas.ExamCreate, db: db_dependency, current_user: model
     return new_exam
 
 
-# Read a specific exam
-@app.get("/exam/{exam_id}", response_model=schemas.Exam)
+@app.get("/exam/{exam_id}", response_model=schemas.Exam,tags=["Exams"])
 async def read_exam(exam_id: int, db: db_dependency):
-    db_exam: object = crud.read_exam(db=db, exam_id=exam_id)
+    db_exam = crud.read_exam(db=db, exam_id=exam_id)
     if db_exam is None:
         raise HTTPException(status_code=404, detail="Exam not found")
     return db_exam
 
 
-# Update an exam
-@app.put("/exam/{exam_id}", response_model=schemas.Exam)
-async def update_exam(exam_id: int, exam: schemas.ExamCreate, db: db_dependency):
-    db_exam = crud.update_exam(db, exam_id, exam)
+@app.put("/exam/{exam_id}", response_model=schemas.Exam, tags=["Exams"])
+async def update_exam(
+        exam_id: int,
+        exam: schemas.ExamCreate,
+        db: db_dependency,
+        current_user: models.User = Depends(get_current_user)
+):
+    db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if db_exam is None:
         raise HTTPException(status_code=404, detail="Exam not found")
-    return db_exam
+
+    if current_user.role != "admin" and db_exam.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to update this exam")
+
+    return crud.update_exam(db, exam_id, exam)
 
 
-
-# Delete an exam
-@app.delete("/exam/{exam_id}", response_model=dict)
-async def delete_exam(exam_id: int, db: db_dependency):
-    result = crud.delete_exam(db, exam_id)
-    if not result:
+@app.delete("/exam/{exam_id}",
+            response_model=dict,
+            tags=["Exams"])
+async def delete_exam(
+        exam_id: int,
+        db: db_dependency,
+        current_user: models.User = Depends(get_current_user)
+):
+    db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if db_exam is None:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if current_user.role != "admin" and db_exam.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this exam")
+
+    crud.delete_exam(db, exam_id)
     return {"message": "Exam deleted successfully"}
 
-
-@app.get("/exams/")
+@app.get("/exams/",
+         tags=["Exams"])
 async def read_exams(db: db_dependency):
-    db_exams = crud.read_exams(db=db)  # Fetch all exams from the database
+    db_exams = crud.read_exams(db=db)
     return db_exams
 
 
 ### Question Routes ###
 
 
-# Create a question
-@app.post("/exam/{exam_id}/question/", response_model=schemas.Question, status_code=status.HTTP_201_CREATED)
-async def create_question(question: schemas.QuestionCreate, exam_id: int, db: Session = Depends(get_db)):
+@app.post("/exam/{exam_id}/question/",
+          response_model=schemas.Question,
+          status_code=status.HTTP_201_CREATED,
+          tags=["Questions"])
+async def create_question(
+        question: schemas.QuestionCreate,
+        exam_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not db_exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if db_exam.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to create a question for this exam")
 
     try:
         db_question = crud.create_question(db=db, question=question, exam_id=exam_id)
@@ -254,8 +271,7 @@ async def create_question(question: schemas.QuestionCreate, exam_id: int, db: Se
         raise HTTPException(status_code=500, detail=f"Failed to create question: {str(e)}")
 
 
-# Get a question
-@app.get("/exam/{exam_id}/question/{question_id}")
+@app.get("/exam/{exam_id}/question/{question_id}",tags=["Questions"])
 async def read_question(exam_id: int,question_id: int, db: Session = Depends(get_db)):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not db_exam:
@@ -266,13 +282,22 @@ async def read_question(exam_id: int,question_id: int, db: Session = Depends(get
     return result
 
 
-# Update a question
-@app.put("/exam/{exam_id}/question/{question_id}", response_model=schemas.Question)
-async def update_question(exam_id: int, question_id: int, question: schemas.QuestionCreate,
-                          db: Session = Depends(get_db)):
+@app.put("/exam/{exam_id}/question/{question_id}", response_model=schemas.Question, tags=["Questions"])
+async def update_question(
+        exam_id: int,
+        question_id: int,
+        question: schemas.QuestionCreate,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+
     if not db_exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if db_exam.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to update this question")
 
     db_question = crud.update_question(db, question_id, question)
     if db_question is None:
@@ -280,22 +305,22 @@ async def update_question(exam_id: int, question_id: int, question: schemas.Ques
 
     return db_question
 
-# Upload an image for a question
-@app.post("/upload/")
+
+@app.post("/image/",tags=["Images"])
 async def upload_image(file: UploadFile = File(...)):
     file_location = os.path.join(UPLOAD_DIR, file.filename)
     with open(file_location, "wb") as f:
         f.write(await file.read())
     return {"filename": file.filename}
 
-@app.get("/static/{filename}")
+@app.get("/image/{filename}",tags=["Images"])
 async def get_image(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path)
 
-@app.delete("/delete-image/{filename}")
+@app.delete("/image/{filename}",tags=["Images"])
 async def delete_image(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
@@ -305,19 +330,29 @@ async def delete_image(filename: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
 
-# Delete a question
-@app.delete("/exam/{exam_id}/question/{question_id}", response_model=dict)
-async def delete_question(exam_id: int,question_id: int, db: db_dependency):
+@app.delete("/exam/{exam_id}/question/{question_id}", response_model=dict, tags=["Questions"])
+async def delete_question(
+        exam_id: int,
+        question_id: int,
+        db: db_dependency,
+        current_user: models.User = Depends(get_current_user)
+):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+
     if not db_exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if db_exam.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this question")
+
     result = crud.delete_question(db, question_id)
     if not result:
         raise HTTPException(status_code=404, detail="Question not found")
+
     return {"message": "Question deleted successfully"}
 
 
-@app.get("/exams/{exam_id}/questions", response_model=List[schemas.Question])
+@app.get("/exams/{exam_id}/questions", response_model=List[schemas.Question],tags=["Questions"])
 async def list_questions_by_exam(exam_id: int, db: db_dependency):
 
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
@@ -335,19 +370,30 @@ async def list_questions_by_exam(exam_id: int, db: db_dependency):
 
 
 @app.post("/exam/{exam_id}/question/{question_id}/choice/", response_model=schemas.Choice,
-          status_code=status.HTTP_201_CREATED)
-async def create_choice(choice: schemas.ChoiceCreate,exam_id: int, question_id: int, db: db_dependency):
+          status_code=status.HTTP_201_CREATED, tags=["Choices"])
+async def create_choice(
+        choice: schemas.ChoiceCreate,
+        exam_id: int,
+        question_id: int,
+        db: db_dependency,
+        current_user: models.User = Depends(get_current_user)
+):
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if exam.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to create choices for this question")
+
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+
     db_choice = crud.create_choice(db=db, choice=choice, question_id=question_id)
     return db_choice
 
 
-@app.get("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=schemas.Choice)
+@app.get("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=schemas.Choice,tags=["Choices"])
 async def read_choice(exam_id: int, question_id: int,choice_id: int, db: Session = Depends(get_db)):
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
@@ -360,35 +406,61 @@ async def read_choice(exam_id: int, question_id: int,choice_id: int, db: Session
         raise HTTPException(status_code=404, detail="Choice not found")
     return result
 
-@app.put("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=schemas.Choice)
-async def update_choice(exam_id: int, question_id: int, choice_id: int, choice: schemas.ChoiceCreate, db: db_dependency):
+
+@app.put("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=schemas.Choice, tags=["Choices"])
+async def update_choice(
+        exam_id: int,
+        question_id: int,
+        choice_id: int,
+        choice: schemas.ChoiceCreate,
+        db: db_dependency,
+        current_user: models.User = Depends(get_current_user)
+):
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if exam.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to update choices for this question")
+
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+
     db_choice = crud.update_choice(db=db, choice_id=choice_id, choice=choice)
     if db_choice is None:
         raise HTTPException(status_code=404, detail="Choice not found")
+
     return db_choice
 
 
-@app.delete("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=dict)
-async def delete_choice(exam_id: int, question_id: int,choice_id: int, db: db_dependency):
+@app.delete("/exam/{exam_id}/question/{question_id}/choice/{choice_id}", response_model=dict, tags=["Choices"])
+async def delete_choice(
+        exam_id: int,
+        question_id: int,
+        choice_id: int,
+        db: db_dependency,
+        current_user: models.User = Depends(get_current_user)
+):
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
+    if exam.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to delete choices for this question")
+
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+
     result = crud.delete_choice(db, choice_id)
     if not result:
         raise HTTPException(status_code=404, detail="Choice not found")
+
     return {"message": "Choice deleted successfully"}
 
 
-@app.get("/exam/{exam_id}/question/{question_id}/choices")
+@app.get("/exam/{exam_id}/question/{question_id}/choices",tags=["Choices"])
 async def list_choices_by_question(exam_id: int, question_id: int, db: Session = Depends(get_db)):
     # Check if the exam exists
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()

@@ -114,24 +114,28 @@ const Table = () => {
                 <p>Number of Questions: {exam.num_questions}</p>
 
                 {exam.image && (
-                  <img
-                    src={`http://localhost:8000/images/${exam.image}`} // Adjusted image URL to match FastAPI route
-                    alt={exam.title}
-                    style={{ width: '100%', height: 'auto', marginBottom: '10px' }}
-                  />
+                    <img
+                        src={`http://localhost:8000/images/${exam.image}`} // Adjusted image URL to match FastAPI route
+                        alt={exam.title}
+                        style={{width: '100%', height: 'auto', marginBottom: '10px'}}
+                    />
                 )}
 
                 <div className="event-actions">
-                  {userRole !== "student" && exam.owner_id === userId && (
-                    <>
-                      <button className="button is-info is-light" onClick={() => handleUpdate(exam.id)}>Update</button>
-                      <button className="button is-danger is-light" onClick={() => handleDelete(exam.id)}>Delete</button>
-                      <button className="button is-primary is-light" onClick={() => handleRedact(exam.id)}>Redact</button>
-                    </>
+                  {(userRole === "admin" || (userRole === "teacher" && exam.owner_id === userId)) && (
+                      <>
+                        <button className="button is-info is-light" onClick={() => handleUpdate(exam.id)}>Update
+                        </button>
+                        <button className="button is-danger is-light" onClick={() => handleDelete(exam.id)}>Delete
+                        </button>
+                        <button className="button is-primary is-light" onClick={() => handleRedact(exam.id)}>Redact
+                        </button>
+                      </>
                   )}
 
                   {exam.num_questions > 0 && (
-                    <button className="button is-success is-light" onClick={() => handleTakeExam(exam.id)}>Take Exam</button>
+                      <button className="button is-success is-light" onClick={() => handleTakeExam(exam.id)}>Take
+                        Exam</button>
                   )}
                 </div>
               </div>
@@ -139,7 +143,7 @@ const Table = () => {
           ))}
         </div>
       ) : (
-        <p>Loading</p>
+          <p>Loading</p>
       )}
     </>
   );
