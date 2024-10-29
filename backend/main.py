@@ -1,11 +1,11 @@
 import logging
 import os
-from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
@@ -19,6 +19,12 @@ import models
 import schemas
 
 app = FastAPI()
+
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -262,14 +268,41 @@ async def read_question(exam_id: int,question_id: int, db: Session = Depends(get
 
 # Update a question
 @app.put("/exam/{exam_id}/question/{question_id}", response_model=schemas.Question)
-async def update_question(exam_id: int,question_id: int, question: schemas.QuestionCreate, db: db_dependency):
+async def update_question(exam_id: int, question_id: int, question: schemas.QuestionCreate,
+                          db: Session = Depends(get_db)):
     db_exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not db_exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+
     db_question = crud.update_question(db, question_id, question)
     if db_question is None:
         raise HTTPException(status_code=404, detail="Question not found")
+
     return db_question
+
+# Upload an image for a question
+@app.post("/upload/")
+async def upload_image(file: UploadFile = File(...)):
+    file_location = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_location, "wb") as f:
+        f.write(await file.read())
+    return {"filename": file.filename}
+
+@app.get("/static/{filename}")
+async def get_image(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
+
+@app.delete("/delete-image/{filename}")
+async def delete_image(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        return {"detail": "Image deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Image not found")
 
 
 # Delete a question

@@ -122,7 +122,8 @@ def create_question(db: Session, question: schemas.QuestionCreate, exam_id: int)
     db_question = models.Question(
         question_text=question.question_text,
         exam_id=exam_id,
-        is_multiple_choice=question.is_multiple_choice
+        is_multiple_choice=question.is_multiple_choice,
+        image_path=question.image_path  # Include the image_path
     )
     db.add(db_question)
     db.commit()
@@ -147,6 +148,7 @@ def update_question(db: Session, question_id: int, question_update: schemas.Ques
 
     db_question.question_text = question_update.question_text
     db_question.is_multiple_choice = question_update.is_multiple_choice
+    db_question.image_path = question_update.image_path  # Update the image_path
 
     # Remove existing choices
     db.query(models.Choice).filter(models.Choice.question_id == question_id).delete()

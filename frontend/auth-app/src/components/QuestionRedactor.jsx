@@ -15,44 +15,48 @@ const QuestionRedactor = () => {
 
     // Fetch existing questions when the component mounts
     useEffect(() => {
-        const fetchQuestions = async () => {
-            try {
-                const response = await fetch(`http://localhost:8000/exams/${examId}/questions`, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const formattedQuestions = data.map(question => ({
-                        id: question.id,
-                        questionText: question.question_text,
-                        choices: question.choices,
-                        is_multiple_choice: question.is_multiple_choice // Set question type from API
-                    }));
-                    setQuestions(formattedQuestions);
-                    addNotification("Questions loaded successfully!", "success");
-                } else {
-                    const errorData = await response.json();
-                    addNotification(`Error: ${errorData.detail || "No existing questions were found"}`, "error");
-                }
-            } catch (error) {
-                addNotification(`An error occurred while fetching questions: ${error.message}`, "error");
-            }
-        };
-
         fetchQuestions();
     }, [token, examId]);
+
+     const fetchQuestions = async () => {
+        try {
+            const response = await fetch(`http://localhost:8000/exams/${examId}/questions`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const formattedQuestions = data.map(question => ({
+                    id: question.id,
+                    questionText: question.question_text,
+                    choices: question.choices,
+                    is_multiple_choice: question.is_multiple_choice,
+                    image: question.image_path ? question.image_path : null,
+                    imagePreview: question.image_path ? `${question.image_path}` : null,
+                }));
+                setQuestions(formattedQuestions);
+                addNotification("Questions loaded successfully!", "success");
+            } else {
+                const errorData = await response.json();
+                addNotification(`Error: ${errorData.detail || "No existing questions were found"}`, "error");
+            }
+        } catch (error) {
+            addNotification(`An error occurred while fetching questions: ${error.message}`, "error");
+        }
+    };
 
     const handleAddQuestion = () => {
         setQuestions([...questions, {
             id: null,
             questionText: "",
             choices: [{ choice_text: "", is_correct: false }],
-            is_multiple_choice: true // Default to multiple choice
+            is_multiple_choice: true,
+            image: null,
+            imagePreview: null,
         }]);
         addNotification("Question added", "info");
     };
@@ -179,6 +183,27 @@ const QuestionRedactor = () => {
 
         try {
             for (const question of questions) {
+                // If there's an image, upload it first
+                let imageUrl = null;
+                if (question.image) {
+                    const formData = new FormData();
+                    formData.append("file", question.image);
+
+                    const uploadResponse = await fetch("http://localhost:8000/upload/", {
+                        method: "POST",
+                        body: formData,
+                    });
+
+                    if (!uploadResponse.ok) {
+                        const errorData = await uploadResponse.json();
+                        addNotification(`Error uploading image: ${errorData.detail || "Upload failed"}`, "error");
+                        return;
+                    }
+
+                    const imageData = await uploadResponse.json();
+                    imageUrl = imageData.filename ? `http://localhost:8000/static/${imageData.filename}` : null;
+                }
+
                 const requestOptions = {
                     method: question.id ? "PUT" : "POST",
                     headers: {
@@ -188,7 +213,8 @@ const QuestionRedactor = () => {
                     body: JSON.stringify({
                         question_text: question.questionText,
                         choices: question.choices,
-                        is_multiple_choice: question.is_multiple_choice
+                        is_multiple_choice: question.is_multiple_choice,
+                        image_path: imageUrl, // Add the image URL to the request
                     }),
                 };
 
@@ -216,6 +242,57 @@ const QuestionRedactor = () => {
         }
     };
 
+    const handleImageChange = (questionIndex, file) => {
+        const newQuestions = [...questions];
+        newQuestions[questionIndex].image = file; // Store the uploaded file in state
+        newQuestions[questionIndex].imagePreview = URL.createObjectURL(file); // Create a preview URL
+        setQuestions(newQuestions);
+        addNotification("Image uploaded successfully!", "info");
+    };
+
+   const handleImageCancel = async (questionIndex) => {
+        const question = questions[questionIndex];
+        if (question.image) {
+            const filename = typeof question.image === 'string' ? question.image.split('/').pop() : null;
+            if (filename) {
+                try {
+                    const response = await fetch(`http://localhost:8000/delete-image/${filename}`, {
+                        method: "DELETE",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                        },
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || "Failed to delete image from the backend");
+                    }
+
+                    const newQuestions = [...questions];
+                    newQuestions[questionIndex].image = null;
+                    newQuestions[questionIndex].imagePreview = null;
+                    setQuestions(newQuestions);
+                    addNotification("Image deleted successfully", "info");
+                } catch (error) {
+                    addNotification(`Error: ${error.message}`, "error");
+                }
+            }else {
+                const newQuestions = [...questions];
+                newQuestions[questionIndex].image = null;
+                newQuestions[questionIndex].imagePreview = null;
+                setQuestions(newQuestions);
+                addNotification("Image deleted successfully", "info");
+            }
+        } else {
+            const newQuestions = [...questions];
+            newQuestions[questionIndex].image = null;
+            newQuestions[questionIndex].imagePreview = null;
+            setQuestions(newQuestions);
+            addNotification("Image deleted successfully", "info");
+        }
+    };
+
     return (
         <div className="container">
             <div className="buttons">
@@ -232,7 +309,8 @@ const QuestionRedactor = () => {
             <h2 className="title">Redact Questions for Exam {examId}</h2>
             <div className="form-container">
                 {questions.map((question, questionIndex) => (
-                    <div key={question.id || questionIndex} className="question-block day-card" style={{ marginBottom: '20px' }}>
+                    <div key={question.id || questionIndex} className="question-block day-card"
+                         style={{marginBottom: '20px'}}>
                         <div className="field">
                             <label className="label">Question Text</label>
                             <input
@@ -269,13 +347,45 @@ const QuestionRedactor = () => {
                             </div>
                         </div>
 
+                        <div className="field">
+                            <label className="label">Upload Image</label>
+                            {!question.imagePreview && (
+                                <div>
+                                    <button
+                                        className="button is-primary"
+                                        onClick={() => document.getElementById(`file-input-${questionIndex}`).click()}
+                                    >
+                                        Upload Image
+                                    </button>
+                                    <input
+                                        type="file"
+                                        id={`file-input-${questionIndex}`}
+                                        accept="image/*"
+                                        style={{display: 'none'}} // Hide the input
+                                        onChange={(e) => handleImageChange(questionIndex, e.target.files[0])}
+                                    />
+                                </div>
+                            )}
+                            {question.imagePreview && (
+                                <div className="image-preview">
+                                    <img src={question.imagePreview} alt="Preview"
+                                         style={{width: '100px', height: 'auto', marginTop: '10px'}}/>
+                                    <button className="button is-danger"
+                                            onClick={() => handleImageCancel(questionIndex)}
+                                            style={{marginLeft: '10px'}}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         {question.choices.map((choice, choiceIndex) => (
                             <div key={choiceIndex} className="field choice-block">
                                 <label className="label">{choiceIndex + 1})</label>
                                 <input
                                     className="input choice-input"
                                     type="text"
-                                    style={{ marginLeft: "10px" }}
+                                    style={{marginLeft: "10px"}}
                                     value={choice.choice_text}
                                     onChange={(e) => handleChoiceChange(questionIndex, choiceIndex, "choice_text", e.target.value)}
                                     placeholder="Enter choice"
@@ -289,9 +399,9 @@ const QuestionRedactor = () => {
                                     Correct
                                 </label>
                                 <button
-                                    className="button is-danger remove-choice"
+                                    className="button is-danger"
                                     onClick={() => handleRemoveChoice(questionIndex, choiceIndex)}
-                                    style={{ marginLeft: "10px" }}
+                                    style={{marginLeft: "6px"}}
                                 >
                                     X
                                 </button>
@@ -302,7 +412,7 @@ const QuestionRedactor = () => {
                             Add choice
                         </button>
                         <button className="button is-danger" onClick={() => handleRemoveQuestion(questionIndex)}
-                            style={{ marginLeft: "10px" }}>
+                                style={{marginLeft: "10px"}}>
                             Remove Question
                         </button>
                     </div>

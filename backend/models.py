@@ -41,6 +41,7 @@ class Question(Base):
     question_text = Column(String(255), nullable=False)
     exam_id = Column(Integer, ForeignKey('exams.id'), nullable=False)
     is_multiple_choice = Column(Boolean, default=True)
+    image_path = Column(String(255), nullable=True)  # New field for storing image paths
 
     exam = relationship("Exam", back_populates="questions")
     choices = relationship("Choice", back_populates="question", cascade="all, delete-orphan")

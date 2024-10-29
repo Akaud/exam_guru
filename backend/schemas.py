@@ -50,6 +50,7 @@ class QuestionCreate(BaseModel):
     question_text: str
     is_multiple_choice: bool
     choices: List[ChoiceCreate]  # Nested list of choices
+    image_path: Optional[str] = None  # New field for storing image paths
 
 class Question(BaseModel):
     id: int
@@ -57,6 +58,7 @@ class Question(BaseModel):
     exam_id: int
     is_multiple_choice: bool
     choices: List[Choice]  # Nested list of choices
+    image_path: Optional[str] = None  # New field for storing image paths
 
     class Config:
         from_attributes = True  # Allows compatibility with SQLAlchemy models

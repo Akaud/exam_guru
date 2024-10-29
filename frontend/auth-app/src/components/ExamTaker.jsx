@@ -5,7 +5,7 @@ import { useNotification } from '../context/NotificationContext';
 
 const ExamTaker = () => {
   const [token] = useContext(UserContext);
-  const { addNotification } = useNotification(); // Get addNotification function from context
+  const { addNotification } = useNotification();
   const [questions, setQuestions] = useState([]);
   const [choices, setChoices] = useState({});
   const [answers, setAnswers] = useState({});
@@ -110,7 +110,7 @@ const ExamTaker = () => {
     setFeedback(newFeedback);
     setTotalScore(totalScore);
     setIsSubmitted(true);
-    addNotification(`Exam submitted! Your score: ${totalScore.toFixed(2)}%`, 'success'); // Add success notification
+    addNotification(`Exam submitted! Your score: ${totalScore.toFixed(2)}%`, 'success');
   };
 
   const handleGoBack = () => {
@@ -129,6 +129,13 @@ const ExamTaker = () => {
         questions.map((question, index) => (
           <div key={question.id} className="question-block day-card wide-card" style={{ marginBottom: '20px' }}>
             <h3>{index + 1}. {question.question_text}</h3>
+            {question.image_path && (
+              <img
+                src={question.image_path}
+                alt={`Image for question ${index + 1}`}
+                style={{ maxWidth: '100%', height: 'auto', marginBottom: '10px' }}
+              />
+            )}
             {choices[question.id] ? choices[question.id].map((choice, choiceIndex) => {
               let choiceClass = '';
 
