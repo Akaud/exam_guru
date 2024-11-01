@@ -7,18 +7,41 @@ const MAX_QUESTION_LENGTH = 255;
 const MAX_CHOICE_LENGTH = 100;
 
 const QuestionRedactor = () => {
-    const [token] = useContext(UserContext);
+    const [token, userRole,, userId] = useContext(UserContext);
     const [questions, setQuestions] = useState([]);
+    const [ownerId, setOwnerId] = useState([]);
     const { examId } = useParams();
     const navigate = useNavigate();
     const { addNotification } = useNotification();
-
-    // Fetch existing questions when the component mounts
     useEffect(() => {
         fetchQuestions();
     }, [token, examId]);
 
      const fetchQuestions = async () => {
+         try {
+            const response = await fetch(`http://localhost:8000/exam/${examId}`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (!token || !(userRole === 'admin' || userId === data.owner_id)) {
+                    setOwnerId(data.owner_id)
+                    navigate('/');
+                    addNotification("You do not have permission to access this page.", "error");
+                return;
+                }
+            } else {
+                const errorData = await response.json();
+                addNotification(`Error: ${errorData.detail || "No existing questions were found"}`, "error");
+            }
+            } catch (error) {
+                addNotification(`An error occurred while fetching questions: ${error.message}`, "error");
+            }
         try {
             const response = await fetch(`http://localhost:8000/exams/${examId}/questions`, {
                 method: "GET",
@@ -183,7 +206,6 @@ const QuestionRedactor = () => {
 
         try {
             for (const question of questions) {
-                // If there's an image, upload it first
                 let imageUrl = null;
                 if (question.image) {
                     const formData = new FormData();
@@ -214,7 +236,7 @@ const QuestionRedactor = () => {
                         question_text: question.questionText,
                         choices: question.choices,
                         is_multiple_choice: question.is_multiple_choice,
-                        image_path: imageUrl, // Add the image URL to the request
+                        image_path: imageUrl,
                     }),
                 };
 
@@ -244,8 +266,8 @@ const QuestionRedactor = () => {
 
     const handleImageChange = (questionIndex, file) => {
         const newQuestions = [...questions];
-        newQuestions[questionIndex].image = file; // Store the uploaded file in state
-        newQuestions[questionIndex].imagePreview = URL.createObjectURL(file); // Create a preview URL
+        newQuestions[questionIndex].image = file;
+        newQuestions[questionIndex].imagePreview = URL.createObjectURL(file);
         setQuestions(newQuestions);
         addNotification("Image uploaded successfully!", "info");
     };

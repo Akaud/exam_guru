@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import LeadModal from "./LeadModal";
 import { UserContext } from "../context/UserContext";
 import { useNotification } from "../context/NotificationContext";
+import {
+  PencilSquareIcon,
+  TrashIcon,
+  PlusCircleIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  CreditCardIcon
+} from "@heroicons/react/24/solid";
 
 const Table = () => {
   const [token, userRole, userName, userId] = useContext(UserContext);
@@ -11,6 +19,8 @@ const Table = () => {
   const [activeModal, setActiveModal] = useState(false);
   const [id, setId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState("alphabetical");
+  const [filterType, setFilterType] = useState("all");
   const navigate = useNavigate();
   const { addNotification } = useNotification();
 
@@ -62,13 +72,13 @@ const Table = () => {
       addNotification("Exams loaded successfully!", "success");
     } catch (error) {
       addNotification(error.message, "error");
-      setLoaded(true); // Set loaded to true even on error for user feedback
+      setLoaded(true);
     }
   };
 
   useEffect(() => {
     getExams();
-  }, [token]);
+  }, []);
 
   const handleModal = () => {
     setActiveModal(!activeModal);
@@ -76,76 +86,124 @@ const Table = () => {
     setId(null);
   };
 
-  const filteredExams = exams.filter(exam => exam.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const sortedAndFilteredExams = exams
+    .filter((exam) => {
+      if (filterType === "myExams" && (userRole === "teacher"||userRole === "admin")) {
+        return exam.owner_id === userId;
+      } else if (filterType === "otherExams" && (userRole === "teacher"||userRole === "admin")) {
+        return exam.owner_id !== userId;
+      }
+      return true;
+    })
+    .filter((exam) => exam.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      if (sortOrder === "alphabetical") {
+        return a.title.localeCompare(b.title);
+      } else if (sortOrder === "reverse") {
+        return b.title.localeCompare(a.title);
+      }
+      return 0;
+    });
 
   return (
-    <>
-      <LeadModal active={activeModal} handleModal={handleModal} token={token} id={id} />
+      <>
+        <LeadModal active={activeModal} handleModal={handleModal} token={token} id={id}/>
 
-      <div className="user-info mb-5">
-        <h4>Welcome, {userRole} {userName}!</h4>
-      </div>
+        <div className="user-info mb-5">
+          <h4>Welcome, {userRole} {userName}!</h4>
+        </div>
 
-      {userRole !== "student" && (
-        <div className="has-text-centered">
-          <button className="button is-success create-exam-button mb-5" onClick={() => setActiveModal(true)}>
-            Create Exam
+        <div className="search-bar mb-3 has-text-centered">
+          <input
+              type="text"
+              placeholder="Search exams..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input is-medium"
+          />
+        </div>
+
+        <div className="sort-filter-buttons mb-5 has-text-centered">
+          <button className="button is-info" onClick={() => setSortOrder("alphabetical")}>
+            <ArrowUpIcon className="icon mr-1" /> A -> Z
+          </button>
+          <button className="button is-info ml-2" onClick={() => setSortOrder("reverse")}>
+            <ArrowDownIcon className="icon mr-1" /> Z -> A
+          </button>
+
+          {(userRole === "teacher" || userRole === "admin") && (
+              <>
+                <button className="button is-primary ml-2" onClick={() => setFilterType("myExams")}>
+                  My Exams
+                </button>
+                <button className="button is-primary ml-2" onClick={() => setFilterType("otherExams")}>
+                  Other People's Exams
+                </button>
+              </>
+          )}
+
+          <button className="button is-warning ml-2" onClick={() => setFilterType("all")}>
+            All Exams
           </button>
         </div>
-      )}
 
-      <div className="search-bar mb-5 has-text-centered">
-        <input
-          type="text"
-          placeholder="Search exams..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="input is-medium"
-        />
-      </div>
+        {loaded ? (
+            <div className="columns" style={{display: 'flex', flexWrap: 'wrap'}}>
+              {sortedAndFilteredExams.map((exam) => (
+                  <div className="column is-one-quarter" key={exam.id} style={{display: 'flex'}}>
+                    <div className="day-card">
+                      <h3 className="day-name exam-title">{exam.title}</h3>
+                      <p className="day-date exam-description">{exam.description}</p>
+                      <p>Number of Questions: {exam.num_questions}</p>
 
-      {loaded ? (
-        <div className="columns is-multiline">
-          {filteredExams.map(exam => (
-            <div className="column is-one-quarter" key={exam.id}>
-              <div className="day-card">
-                <h3 className="day-name exam-title">{exam.title}</h3>
-                <p className="day-date exam-description">{exam.description}</p>
-                <p>Number of Questions: {exam.num_questions}</p>
+                      {exam.image && (
+                          <img
+                              src={`http://localhost:8000/images/${exam.image}`}
+                              alt={exam.title}
+                              style={{width: '100%', height: 'auto', marginBottom: '10px'}}
+                          />
+                      )}
 
-                {exam.image && (
-                    <img
-                        src={`http://localhost:8000/images/${exam.image}`} // Adjusted image URL to match FastAPI route
-                        alt={exam.title}
-                        style={{width: '100%', height: 'auto', marginBottom: '10px'}}
-                    />
-                )}
+                      <div className="event-actions">
+                        {(userRole === "admin" || (userRole === "teacher" && exam.owner_id === userId)) && (
+                            <>
+                              <button className="button is-info is-light" onClick={() => handleUpdate(exam.id)}>
+                                <CreditCardIcon className="icon mr-1" /> Update info
+                              </button>
+                              <button className="button is-danger is-light" onClick={() => handleDelete(exam.id)}>
+                                <TrashIcon className="icon mr-1" /> Delete
+                              </button>
+                              <button className="button is-primary is-light" onClick={() => handleRedact(exam.id)}>
+                                <PencilSquareIcon className="icon mr-1" /> Edit questions
+                              </button>
+                            </>
+                        )}
 
-                <div className="event-actions">
-                  {(userRole === "admin" || (userRole === "teacher" && exam.owner_id === userId)) && (
-                      <>
-                        <button className="button is-info is-light" onClick={() => handleUpdate(exam.id)}>Update
-                        </button>
-                        <button className="button is-danger is-light" onClick={() => handleDelete(exam.id)}>Delete
-                        </button>
-                        <button className="button is-primary is-light" onClick={() => handleRedact(exam.id)}>Redact
-                        </button>
-                      </>
-                  )}
+                        {exam.num_questions > 0 && (
+                            <button className="button is-success is-light" onClick={() => handleTakeExam(exam.id)}>
+                              Take Exam
+                            </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+              ))}
 
-                  {exam.num_questions > 0 && (
-                      <button className="button is-success is-light" onClick={() => handleTakeExam(exam.id)}>Take
-                        Exam</button>
-                  )}
-                </div>
-              </div>
+              {userRole !== "student" && (
+                  <div className="column is-one-quarter"
+                       style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                    <div className="day-card is-flex is-justify-content-center is-align-items-center"
+                         style={{cursor: 'pointer', height: '100%', textAlign: 'center', fontSize: '2rem'}}
+                         onClick={() => setActiveModal(true)}>
+                      <PlusCircleIcon className="icon mr-1" /> Add one more exam
+                    </div>
+                  </div>
+              )}
             </div>
-          ))}
-        </div>
-      ) : (
-          <p>Loading</p>
-      )}
-    </>
+        ) : (
+            <p>Loading</p>
+        )}
+      </>
   );
 };
 

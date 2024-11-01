@@ -18,7 +18,7 @@ class User(BaseModel):
     role: str
 
     class Config:
-        from_attributes = True  # Allows compatibility with SQLAlchemy models
+        from_attributes = True
 
 class ExamCreate(BaseModel):
     title: str
@@ -31,7 +31,7 @@ class Exam(BaseModel):
     owner_id: int
 
     class Config:
-        from_attributes = True  # Allows compatibility with SQLAlchemy models
+        from_attributes = True
 
 class ChoiceCreate(BaseModel):
     choice_text: str
@@ -44,21 +44,21 @@ class Choice(BaseModel):
     question_id: int
 
     class Config:
-        from_attributes = True  # Allows compatibility with SQLAlchemy models
+        from_attributes = True
 
 class QuestionCreate(BaseModel):
     question_text: str
     is_multiple_choice: bool
-    choices: List[ChoiceCreate]  # Nested list of choices
-    image_path: Optional[str] = None  # New field for storing image paths
+    choices: List[ChoiceCreate]
+    image_path: Optional[str] = None
 
 class Question(BaseModel):
     id: int
     question_text: str
     exam_id: int
     is_multiple_choice: bool
-    choices: List[Choice]  # Nested list of choices
-    image_path: Optional[str] = None  # New field for storing image paths
+    choices: List[Choice]
+    image_path: Optional[str] = None
 
     class Config:
-        from_attributes = True  # Allows compatibility with SQLAlchemy models
+        from_attributes = True

@@ -4,40 +4,86 @@ export const UserContext = createContext();
 
 export const UserProvider = (props) => {
     const [token, setToken] = useState(localStorage.getItem("token"));
-    const [userRole, setUserRole] = useState(null);  // State for storing the user role
-    const [userName, setUserName] = useState(null);  // New state for storing the user name
-    const [userId, setUserId] = useState(null);  // New state for storing the user name
+    const [userRole, setUserRole] = useState(null);
+    const [userName, setUserName] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [exp, setExp] = useState(null);
 
     useEffect(() => {
-        const fetchUser = async () => {
-            const requestOptions = {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
-                }
-            };
-            const response = await fetch(`http://localhost:8000/verify-token/${token}`, requestOptions);
-            if (response.ok) {
-                const data = await response.json();
-                setUserRole(data.role);  // Set the role from the API response
-                setUserName(data.name);  // Set the name from the API response
-                setUserId(data.user_id);
-            } else {
-                setToken(null);
-                setUserRole(null);
-                setUserName(null);  // Clear name on error
-                setUserId(null);
+        const decodeToken = (token) => {
+            try {
+                const payloadBase64 = token.split(".")[1];
+                const decodedPayload = JSON.parse(atob(payloadBase64));
+                return {
+                    userId: decodedPayload.id,
+                    userName: decodedPayload.username,
+                    userRole: decodedPayload.role,
+                    exp: decodedPayload.exp
+                };
+            } catch (error) {
+                console.error("Failed to decode token:", error);
+                return null;
             }
-            localStorage.setItem("token", token);
         };
+
+        const refreshToken = async () => {
+            try {
+                const response = await fetch(`http://localhost:8000/refresh-token`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setToken(data.access_token);
+                    localStorage.setItem("token", data.access_token);
+                    const decoded = decodeToken(data.access_token);
+                    if (decoded) {
+                        setExp(decoded.exp);
+                    }
+                } else {
+                    handleLogout();
+                }
+            } catch (error) {
+                console.error("Failed to refresh token:", error);
+                handleLogout();
+            }
+        };
+
+        const handleLogout = () => {
+            setToken(null);
+            setUserRole(null);
+            setUserName(null);
+            setUserId(null);
+            setExp(null);
+            localStorage.removeItem("token");
+        };
+
         if (token) {
-            fetchUser();
+            const decoded = decodeToken(token);
+            if (decoded) {
+                setUserRole(decoded.userRole);
+                setUserName(decoded.userName);
+                setUserId(decoded.userId);
+                setExp(decoded.exp);
+            } else {
+                handleLogout();
+            }
         }
-    }, [token]);
+
+        const intervalId = setInterval(() => {
+            if (exp && Date.now() >= exp * 1000 - 60 * 1000) {
+                refreshToken();
+            }
+        }, 60 * 1000);
+
+        return () => clearInterval(intervalId);
+    }, [token, exp]);
 
     return (
-        <UserContext.Provider value={[token, userRole, userName,userId, setToken]}>
+        <UserContext.Provider value={[ token, userRole, userName, userId, setToken ]}>
             {props.children}
         </UserContext.Provider>
     );

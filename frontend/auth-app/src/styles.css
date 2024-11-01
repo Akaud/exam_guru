@@ -232,8 +232,12 @@ body {
   font-size: 1.2rem; /* Increase font size for visibility */
   padding: 12px 24px; /* Increase padding for a larger button */
   transition: background-color 0.3s, transform 0.2s; /* Smooth transition for hover effects */
-  display: inline-block; /* Ensure button has block-level appearance */
-  margin: 0 auto; /* Center the button */
+  display: flex; /* Use flexbox for centering */
+  justify-content: center; /* Center text horizontally */
+  align-items: center; /* Center text vertically */
+  margin: 0 auto; /* Center the button itself */
+  border-radius: 10px; /* Optional: rounded corners */
+  cursor: pointer; /* Optional: change cursor on hover */
 }
 
 /* Button hover effects */

@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useContext, useState } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import Register from './components/Register.jsx';
@@ -40,7 +39,7 @@ const App = () => {
         </div>
         <div className="column"></div>
       </div>
-      <Footer /> {/* Footer will always be at the bottom */}
+      <Footer />
     </div>
   );
 };

@@ -6,7 +6,6 @@ from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# User Management
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = pwd_context.hash(user.password)
     db_user = models.User(
@@ -62,7 +61,13 @@ def delete_user(db: Session, user_id: int):
     return True
 
 
-# Exam Management
+def get_users(db: Session):
+    users = db.query(models.User).all()
+    if not users:
+        return []
+    return users
+
+
 def create_exam(db: Session, exam: schemas.ExamCreate, user_id: int):
     db_exam = models.Exam(
         title=exam.title,
@@ -117,7 +122,6 @@ def delete_exam(db: Session, exam_id: int):
     return True
 
 
-# Question Management
 def create_question(db: Session, question: schemas.QuestionCreate, exam_id: int):
     db_question = models.Question(
         question_text=question.question_text,
@@ -148,12 +152,10 @@ def update_question(db: Session, question_id: int, question_update: schemas.Ques
 
     db_question.question_text = question_update.question_text
     db_question.is_multiple_choice = question_update.is_multiple_choice
-    db_question.image_path = question_update.image_path  # Update the image_path
+    db_question.image_path = question_update.image_path
 
-    # Remove existing choices
     db.query(models.Choice).filter(models.Choice.question_id == question_id).delete()
 
-    # Add updated choices
     for choice in question_update.choices:
         db_choice = models.Choice(
             choice_text=choice.choice_text,
@@ -167,22 +169,19 @@ def update_question(db: Session, question_id: int, question_update: schemas.Ques
     return db_question
 
 
+def get_questions_by_exam(db: Session, exam_id: int):
+    questions = db.query(models.Question).filter(models.Question.exam_id == exam_id).all()
+    if not questions:
+        return []
+    return questions
+
+
 def delete_question(db: Session, question_id: int):
     db_question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not db_question:
         return None
 
     db.delete(db_question)
-    db.commit()
-    return True
-
-
-# Choice Management
-def delete_choice(db: Session, choice_id: int):
-    db_choice = db.query(models.Choice).filter(models.Choice.id == choice_id).first()
-    if not db_choice:
-        return None
-    db.delete(db_choice)
     db.commit()
     return True
 
@@ -210,15 +209,10 @@ def update_choice(db: Session, choice_id: int, choice: schemas.ChoiceCreate):
     return db_choice
 
 
-def get_questions_by_exam(db: Session, exam_id: int):
-    questions = db.query(models.Question).filter(models.Question.exam_id == exam_id).all()
-    if not questions:
-        return []
-    return questions
-
-
-def get_users(db: Session):
-    users = db.query(models.User).all()
-    if not users:
-        return []
-    return users
+def delete_choice(db: Session, choice_id: int):
+    db_choice = db.query(models.Choice).filter(models.Choice.id == choice_id).first()
+    if not db_choice:
+        return None
+    db.delete(db_choice)
+    db.commit()
+    return True

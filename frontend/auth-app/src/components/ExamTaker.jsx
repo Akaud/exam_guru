@@ -11,11 +11,34 @@ const ExamTaker = () => {
   const [answers, setAnswers] = useState({});
   const [feedback, setFeedback] = useState([]);
   const [totalScore, setTotalScore] = useState(null);
+  const [examTitle, setExamTitle] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { examId } = useParams();
   const navigate = useNavigate();
 
   useEffect(() => {
+    const fetchExamDetails = async () => {
+      try {
+        const response = await fetch(`http://localhost:8000/exam/${examId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setExamTitle(data.title);
+          fetchQuestions();
+        } else {
+          addNotification('Failed to load exam details', 'error');
+        }
+      } catch (error) {
+        addNotification('An error occurred while fetching exam details', 'error');
+      }
+    };
+
     const fetchQuestions = async () => {
       try {
         const response = await fetch(`http://localhost:8000/exams/${examId}/questions`, {
@@ -58,8 +81,7 @@ const ExamTaker = () => {
         addNotification(`An error occurred while fetching choices for question ID: ${questionId}`, 'error');
       }
     };
-
-    fetchQuestions();
+    fetchExamDetails()
   }, [examId, token, addNotification]);
 
   const handleAnswerChange = (questionId, choiceIndex) => {
@@ -84,8 +106,6 @@ const ExamTaker = () => {
 
       const correctCount = userAnswerIndexes.filter(index => correctIndexes.includes(index)).length;
       const totalCorrectChoices = correctIndexes.length;
-
-      // Calculate score for the question as a proportion of correct answers chosen
       const questionScore = totalCorrectChoices > 0 ? correctCount / totalCorrectChoices : 0;
 
       const isCorrect = question.is_multiple_choice
@@ -104,7 +124,6 @@ const ExamTaker = () => {
       };
     });
 
-    // Calculate total score by summing up all question scores and averaging them
     const totalScore = (newFeedback.reduce((sum, feedbackItem) => sum + feedbackItem.questionScore, 0) / questions.length) * 100;
 
     setFeedback(newFeedback);
@@ -122,7 +141,7 @@ const ExamTaker = () => {
 
   return (
     <div className="container">
-      <h2 className="title">Take Exam {examId}</h2>
+      <h2 className="title">{examTitle || 'Loading...'}</h2>
       {questions.length === 0 ? (
         <p>Loading questions...</p>
       ) : (

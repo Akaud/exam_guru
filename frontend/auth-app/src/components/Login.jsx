@@ -1,12 +1,12 @@
 import React, { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
-import { useNotification } from "../context/NotificationContext"; // Import useNotification hook
+import { useNotification } from "../context/NotificationContext";
 
 const Login = ({ toggleForm }) => {
   const [Username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [,,,,setToken] = useContext(UserContext); // Correctly destructuring token, userRole, and setToken
-  const { addNotification } = useNotification(); // Get addNotification function from context
+  const [,,,,setToken] = useContext(UserContext);
+  const { addNotification } = useNotification();
 
   const submitLogin = async () => {
     const requestOptions = {
@@ -22,11 +22,11 @@ const Login = ({ toggleForm }) => {
     const data = await response.json();
 
     if (!response.ok) {
-      addNotification(data.detail, "error"); // Show error notification
+      addNotification(data.detail, "error");
     } else {
       setToken(data.access_token);
       localStorage.setItem("token", data.access_token);
-      addNotification("Login successful!", "success"); // Show success notification
+      addNotification("Login successful!", "success");
     }
   };
 

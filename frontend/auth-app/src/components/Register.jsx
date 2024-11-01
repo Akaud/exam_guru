@@ -1,6 +1,6 @@
 import React, { useContext, useState } from "react";
 import { UserContext } from "../context/UserContext";
-import { useNotification } from "../context/NotificationContext"; // Import the useNotification hook
+import { useNotification } from "../context/NotificationContext";
 
 const Register = ({ toggleForm }) => {
   const [Username, setUsername] = useState("");
@@ -11,7 +11,7 @@ const Register = ({ toggleForm }) => {
   const [password, setPassword] = useState("");
   const [confirmationPassword, setConfirmationPassword] = useState("");
   const [,,,,setToken] = useContext(UserContext);
-  const { addNotification } = useNotification(); // Get addNotification function from context
+  const { addNotification } = useNotification();
 
   const submitRegistration = async () => {
     const requestOptions = {
@@ -31,11 +31,9 @@ const Register = ({ toggleForm }) => {
     const data = await response.json();
 
     if (!response.ok) {
-      addNotification(data.detail, "error"); // Show error notification
+      addNotification(data.detail, "error");
     } else {
-      addNotification("Registration successful!", "success"); // Show success notification
-
-      // Auto-login after successful registration
+      addNotification("Registration successful!", "success");
       const formDetails = new URLSearchParams();
       formDetails.append("username", Username);
       formDetails.append("password", password);
@@ -49,18 +47,17 @@ const Register = ({ toggleForm }) => {
           body: formDetails,
         });
 
-        // Ensure loginResponse is processed correctly
         if (loginResponse.ok) {
-          const loginData = await loginResponse.json(); // Store the login response
+          const loginData = await loginResponse.json();
           localStorage.setItem("token", loginData.access_token);
-          setToken(loginData.access_token); // Set the token in the context
-          addNotification("Login successful!", "success"); // Show login success notification
+          setToken(loginData.access_token);
+          addNotification("Login successful!", "success");
         } else {
-          const loginErrorData = await loginResponse.json(); // Fetch error message for failed login
-          addNotification(loginErrorData.detail, "error"); // Show error notification
+          const loginErrorData = await loginResponse.json();
+          addNotification(loginErrorData.detail, "error");
         }
       } catch (error) {
-        addNotification("An error occurred during login.", "error"); // Show error notification
+        addNotification("An error occurred during login.", "error");
       }
     }
   };
@@ -70,7 +67,7 @@ const Register = ({ toggleForm }) => {
     if (password === confirmationPassword && password.length > 5) {
       submitRegistration();
     } else {
-      addNotification("Ensure that the passwords match and are greater than 5 characters.", "error"); // Show error notification
+      addNotification("Ensure that the passwords match and are greater than 5 characters.", "error");
     }
   };
 

@@ -31,7 +31,7 @@ const LeadModal = ({ active, handleModal, token, id }) => {
     if (id) {
       getExam();
     } else {
-      cleanFormData(); // Clear form data if creating a new exam
+      cleanFormData();
     }
   }, [id, token]);
 
@@ -42,18 +42,18 @@ const LeadModal = ({ active, handleModal, token, id }) => {
 
   const handleCreateExam = async (e) => {
     e.preventDefault();
-    setLoading(true); // Start loading
+    setLoading(true);
 
     if (!exam.trim() || !description.trim()) {
       addNotification("Exam name and description cannot be empty.", "error");
-      setLoading(false); // Stop loading
+      setLoading(false);
       return;
     }
 
     const requestOptions = {
       method: "POST",
       headers: {
-        "Content-Type": "application/json", // Set content type for JSON
+        "Content-Type": "application/json",
         Authorization: "Bearer " + token,
       },
       body: JSON.stringify({
@@ -63,31 +63,31 @@ const LeadModal = ({ active, handleModal, token, id }) => {
     };
 
     const response = await fetch("http://localhost:8000/exam/", requestOptions);
-    setLoading(false); // Stop loading
+    setLoading(false);
     if (!response.ok) {
       const errorMessage = await response.json();
       addNotification("Something went wrong when creating exam: " + (errorMessage.detail || errorMessage), "error");
     } else {
-      cleanFormData(); // Clear fields after successful creation
+      cleanFormData();
       addNotification("Exam created successfully!", "success");
-      handleModal(); // Close the modal
+      handleModal();
     }
   };
 
   const handleUpdateExam = async (e) => {
     e.preventDefault();
-    setLoading(true); // Start loading
+    setLoading(true);
 
     if (!exam.trim() || !description.trim()) {
       addNotification("Exam name and description cannot be empty.", "error");
-      setLoading(false); // Stop loading
+      setLoading(false);
       return;
     }
 
     const requestOptions = {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json", // Set content type for JSON
+        "Content-Type": "application/json",
         Authorization: "Bearer " + token,
       },
       body: JSON.stringify({
@@ -97,22 +97,22 @@ const LeadModal = ({ active, handleModal, token, id }) => {
     };
 
     const response = await fetch(`http://localhost:8000/exam/${id}`, requestOptions);
-    setLoading(false); // Stop loading
+    setLoading(false);
     if (!response.ok) {
       const errorMessage = await response.json();
       addNotification("Something went wrong when updating exam: " + (errorMessage.detail || errorMessage), "error");
     } else {
-      cleanFormData(); // Clear fields after successful update
+      cleanFormData();
       addNotification("Exam updated successfully!", "success");
-      handleModal(); // Close the modal
+      handleModal();
     }
   };
 
   return (
     <div className={`modal ${active && "is-active"}`}>
       <div className="modal-background" onClick={() => {
-        handleModal(); // Close modal and clean up
-        cleanFormData(); // Clear the form when the modal is closed
+        handleModal();
+        cleanFormData();
       }}></div>
       <div className="modal-card">
         <header className="modal-card-head has-background-primary-light">
@@ -153,8 +153,8 @@ const LeadModal = ({ active, handleModal, token, id }) => {
                 {loading ? "Saving..." : (id ? "Update" : "Create")}
               </button>
               <button className="button" style={{ marginLeft: "10px" }} onClick={() => {
-                handleModal(); // Close the modal
-                cleanFormData(); // Clear the form when the modal is closed
+                handleModal();
+                cleanFormData();
               }}>
                 Cancel
               </button>

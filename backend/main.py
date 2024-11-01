@@ -1,18 +1,16 @@
 import logging
 import os
-
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse
-from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
-
-from database import engine, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 from typing import Annotated, List
 
+from database import engine, SessionLocal
 import crud
 import models
 import schemas
@@ -42,6 +40,14 @@ logger = logging.getLogger(__name__)
 
 models.Base.metadata.create_all(bind=engine)
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SECRET_KEY = os.environ.get("SECRET_KEY", "your_secret_key")
+ALGORITHM = os.environ.get("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = 25
+REFRESH_TOKEN_EXPIRE_DAYS = 10
+
+db_dependency = Annotated[Session, Depends(lambda: SessionLocal())]
+
 
 def get_db():
     db = SessionLocal()
@@ -51,15 +57,7 @@ def get_db():
         db.close()
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = os.environ.get("SECRET_KEY")
-ALGORITHM = os.environ.get("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-db_dependency = Annotated[Session, Depends(get_db)]
-
-
-@app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED,tags=["Users"])
+@app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED, tags=["Users"])
 async def register_user(user: schemas.UserCreate, db: db_dependency) -> schemas.User:
     db_user = crud.get_user(db=db, username=user.username)
     if db_user:
@@ -69,22 +67,23 @@ async def register_user(user: schemas.UserCreate, db: db_dependency) -> schemas.
 
 def authenticate_user(username: str, password: str, db: db_dependency):
     user = crud.get_user(db=db, username=username)
-    if not user:
-        return False
-    if not pwd_context.verify(password, user.hashed_password):
+    if not user or not pwd_context.verify(password, user.hashed_password):
         return False
     return user
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
     to_encode.update({'exp': expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 @app.post("/token")
@@ -96,18 +95,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"}
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username},
-        expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    token_data = {"id": user.id, "username": user.username, "role": user.role}
+    access_token = create_access_token(data=token_data, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    refresh_token = create_refresh_token(data=token_data)
+
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 
 def verify_token(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
+        username: str = payload.get("username")
         if username is None:
             raise HTTPException(status_code=403, detail="Token is invalid")
         return payload
@@ -118,18 +117,36 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 @app.get("/verify-token/{token}")
 async def verify_user_token(token: str, db: Session = Depends(get_db)):
     payload = verify_token(token=token)
-    username = payload.get("sub")
-
+    username = payload.get("username")
     user = crud.get_user(db, username=username)
+
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return {
-        "message": "Token is valid",
-        "role": user.role,
-        "user_id": user.id,
-        "name": user.name
-    }
+    new_token = create_access_token(
+        {"id": user.id, "username": user.username, "role": user.role},
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    return {"message": "Token is valid","access_token": new_token}
+
+
+@app.post("/refresh-token")
+async def refresh_access_token(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("id")
+        username: str = payload.get("username")
+        role: str = payload.get("role")
+        if user_id is None or username is None or role is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid refresh token")
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        access_token = create_access_token(data={"id": user_id, "username": username, "role": role})
+
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid refresh token")
 
 @app.get("/users", response_model=List[schemas.User],tags=["Users"])
 async def list_users(db: db_dependency):
@@ -145,12 +162,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_username: str = payload.get("sub")
-        if user_username is None:
+        user_id: int = payload.get("id")
+        username: str = payload.get("username")
+        role: str = payload.get("role")
+        if user_id is None or username is None or role is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    user_id = crud.get_user_id(db, user_username)
+
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
         raise credentials_exception
@@ -183,15 +202,7 @@ def create_exam(
     if current_user.role not in ["teacher", "admin"]:
         raise HTTPException(status_code=403, detail="You do not have permission to create an exam")
 
-    new_exam = models.Exam(
-        title=exam.title,
-        description=exam.description,
-        owner_id=current_user.id
-    )
-    db.add(new_exam)
-    db.commit()
-    db.refresh(new_exam)
-    return new_exam
+    return crud.create_exam(db,exam,current_user.id)
 
 
 @app.get("/exam/{exam_id}", response_model=schemas.Exam,tags=["Exams"])
@@ -312,6 +323,7 @@ async def upload_image(file: UploadFile = File(...)):
     with open(file_location, "wb") as f:
         f.write(await file.read())
     return {"filename": file.filename}
+
 
 @app.get("/image/{filename}",tags=["Images"])
 async def get_image(filename: str):
