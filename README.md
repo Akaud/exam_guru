@@ -41,7 +41,7 @@ A full-stack application for managing exams, questions, and choices, built with 
 
 1. **Navigate to Frontend Folder**:
    ```bash
-   cd frontend
+   cd frontend/auth-app
    ```
 
 2. **Install Dependencies**:
