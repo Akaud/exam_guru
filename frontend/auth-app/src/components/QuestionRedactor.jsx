@@ -199,64 +199,71 @@ const QuestionRedactor = () => {
     };
 
     const handleSubmit = async () => {
-        const confirmSave = window.confirm("Do you really want to save the questions?");
-        if (!confirmSave) return;
+    const confirmSave = window.confirm("Do you really want to save the questions?");
+    if (!confirmSave) return;
 
-        if (!validateQuestions()) return;
+    if (!validateQuestions()) return;
 
-        try {
-            for (const question of questions) {
-                let imageUrl = null;
-                if (question.image) {
-                    const formData = new FormData();
-                    formData.append("file", question.image);
+    try {
+        for (const question of questions) {
+            let imageUrl = null;
 
-                    const uploadResponse = await fetch("http://localhost:8000/image/", {
-                        method: "POST",
-                        body: formData,
-                    });
+            // Check if question.image is a valid File object before upload
+            if (question.image && question.image instanceof File) {
+                const formData = new FormData();
+                formData.append("file", question.image);
 
-                    if (!uploadResponse.ok) {
-                        const errorData = await uploadResponse.json();
-                        addNotification(`Error uploading image: ${errorData.detail || "Upload failed"}`, "error");
-                        return;
-                    }
+                const uploadResponse = await fetch("http://localhost:8000/image/", {
+                    method: "POST",
+                    body: formData,
+                });
 
-                    const imageData = await uploadResponse.json();
-                    imageUrl = imageData.filename ? `http://localhost:8000/image/${imageData.filename}` : null;
-                }
-
-                const requestOptions = {
-                    method: question.id ? "PUT" : "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        question_text: question.questionText,
-                        choices: question.choices,
-                        is_multiple_choice: question.is_multiple_choice,
-                        image_path: imageUrl,
-                    }),
-                };
-
-                const url = question.id
-                    ? `http://localhost:8000/exam/${examId}/question/${question.id}`
-                    : `http://localhost:8000/exam/${examId}/question`;
-
-                const response = await fetch(url, requestOptions);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    addNotification(`Error: ${errorData.detail || "Failed to create or update question"}`, "error");
+                if (!uploadResponse.ok) {
+                    const errorData = await uploadResponse.json();
+                    addNotification(`Error uploading image: ${errorData.detail || "Upload failed"}`, "error");
                     return;
                 }
+
+                const imageData = await uploadResponse.json();
+                imageUrl = imageData.filename ? `http://localhost:8000/image/${imageData.filename}` : null;
+            } else if (typeof question.image === 'string') {
+                // If question.image is already a URL, retain it
+                imageUrl = question.image;
             }
-            addNotification("Questions saved successfully!", "success");
-            navigate(`/exam/${examId}`);
-        } catch (error) {
-            addNotification(`An error occurred while saving questions: ${error.message}`, "error");
+
+            const requestOptions = {
+                method: question.id ? "PUT" : "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    question_text: question.questionText,
+                    choices: question.choices,
+                    is_multiple_choice: question.is_multiple_choice,
+                    image_path: imageUrl,
+                }),
+            };
+
+            const url = question.id
+                ? `http://localhost:8000/exam/${examId}/question/${question.id}`
+                : `http://localhost:8000/exam/${examId}/question`;
+
+            const response = await fetch(url, requestOptions);
+            if (!response.ok) {
+                const errorData = await response.json();
+                addNotification(`Error: ${errorData.detail || "Failed to create or update question"}`, "error");
+                return;
+            }
         }
-    };
+
+        addNotification("Questions saved successfully!", "success");
+        navigate(`/exam/${examId}`);
+    } catch (error) {
+        addNotification(`An error occurred while saving questions: ${error.message}`, "error");
+    }
+};
+
 
     const handleGoBack = () => {
         if (window.confirm("Are you sure you want to go back? Unsaved changes will be lost.")) {
