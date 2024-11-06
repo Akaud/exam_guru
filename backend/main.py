@@ -43,7 +43,7 @@ models.Base.metadata.create_all(bind=engine)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.environ.get("SECRET_KEY", "your_secret_key")
 ALGORITHM = os.environ.get("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = 25
+ACCESS_TOKEN_EXPIRE_MINUTES = 2
 REFRESH_TOKEN_EXPIRE_DAYS = 10
 
 db_dependency = Annotated[Session, Depends(lambda: SessionLocal())]
@@ -123,10 +123,7 @@ async def verify_user_token(token: str, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    new_token = create_access_token(
-        {"id": user.id, "username": user.username, "role": user.role},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    return {"message": "Token is valid","access_token": new_token}
+    return {"message": "Token is valid","access_token": token}
 
 
 @app.post("/refresh-token")
@@ -141,7 +138,9 @@ async def refresh_access_token(token: str = Depends(oauth2_scheme), db: Session 
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        access_token = create_access_token(data={"id": user_id, "username": username, "role": role})
+        access_token = create_access_token(
+        {"id": user.id, "username": user.username, "role": user.role},
+                timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
         return {"access_token": access_token, "token_type": "bearer"}
 
